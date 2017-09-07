@@ -1,0 +1,4 @@
+[submodule "learning_stats/ThinkStats2"]
+	path = learning_stats/ThinkStats2
+	url = https://github.com/AllenDowney/ThinkStats2.git
+	branch = master
