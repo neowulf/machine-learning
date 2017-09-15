@@ -1,1 +1,0 @@
-ThinkStats2/code/thinkstats2.py
