@@ -1,3 +1,7 @@
 .idea
 
 *.pyc
+
+# coursera-machine-learning related
+octave-workspace
+token.mat
