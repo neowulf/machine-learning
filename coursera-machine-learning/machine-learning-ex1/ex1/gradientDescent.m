@@ -19,7 +19,7 @@ for iter = 1:num_iters
 
 
     h = X * theta;
-    errors = h - y; %
+    errors = h - y;
     theta_change = (alpha / m) * X' * errors;
 
     theta = theta - theta_change;
