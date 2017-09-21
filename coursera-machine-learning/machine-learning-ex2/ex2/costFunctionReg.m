@@ -18,9 +18,19 @@ grad = zeros(size(theta));
 %               derivatives of the cost w.r.t. each parameter in theta
 
 
+h = sigmoid(theta' * X')';
 
+theta = [0; theta(2:end)];
 
+j_theta_summation = ((theta .^ 2)' * ones(rows(theta), 1));
+j_reg_term = (lambda / (2 * m)) * j_theta_summation;
 
+logistic_fn = ((-y' * log(h)) - ((1 - y)' * log(1 - h)));
+
+J = ((1 / m) * logistic_fn) + j_reg_term;
+
+g_reg_term = (lambda / m) .* theta;
+grad = ((1 / m) * (X' * (h - y))) + g_reg_term;
 
 % =============================================================
 
