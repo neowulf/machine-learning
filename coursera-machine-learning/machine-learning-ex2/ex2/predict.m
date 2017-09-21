@@ -15,11 +15,9 @@ p = zeros(m, 1);
 %               You should set p to a vector of 0's and 1's
 %
 
-
-
-
-
-
+threshold = 0.5 .* ones(m, 1);
+predict_y = sigmoid(theta' * X')'
+p = predict_y >= threshold
 
 % =========================================================================
 
