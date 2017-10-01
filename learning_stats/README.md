@@ -1,11 +1,11 @@
 ## Installation Instructions
 
 ```bash
-$ pip3 install --upgrade pip virtualenv virtualenvwrapper
 
-$ pip3 install --upgrade jupyter matplotlib numpy panadas scipy scikit-learn statsmodels
+conda create -n machine_learning python=3.5 jupyter matplotlib numpy pandas scipy scikit-learn statsmodels
 
-$ jupyter notebook
+conda activate machine_learning
+conda env export > conda-environment.yml
 ```
 
 #### Configure matplotlib
@@ -18,16 +18,6 @@ $ echo "backend : Agg" > ~/.matplotlib/matplotlibrc
 
 ```
 
-#### Configure virtualenv
-
-```bash
-$ mkvirtualenv --system-site-packages -p python3 machine_learning
-
-$ workon machine_learning
-
-# doesn't influence jupyter notebook
-$ add2virtualenv ThinkStats2/code/
-```
 
 #### Run notebook
 
