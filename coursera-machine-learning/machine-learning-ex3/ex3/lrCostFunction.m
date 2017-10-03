@@ -36,13 +36,18 @@ grad = zeros(size(theta));
 %           grad = grad + YOUR_CODE_HERE (using the temp variable)
 %
 
+h = sigmoid(X * theta);
 
+grad = 1/m * (X' * (h - y));
+temp = theta;
+temp(1) = 0;
+grad = grad + ((lambda / m) * temp);
 
+logistic_fn = ((-y' * log(h))) - ((1 - y)' * (log (1 - h)));
 
-
-
-
-
+% cost function / will be scalar
+j_reg_term = ((lambda / (2*m)) * ( (temp .^ 2)' * ones(rows(temp), 1) ));
+J = ((1/m) * logistic_fn) + j_reg_term;
 
 
 % =============================================================
