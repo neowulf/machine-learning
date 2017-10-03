@@ -74,7 +74,7 @@ z2 = a1 * Theta1';
 a2 = [ones(size(z2, 1), 1) sigmoid(z2)];
 z3 = a2 * Theta2';
 
-H = h = predict_y = sigmoid(z3);
+a3 = h = predict_y = sigmoid(z3);
 
 j_theta_summation = sum(sum((Theta1(:, 2:end).^2), 2)) + sum(sum((Theta2(:, 2:end).^2), 2));
 j_reg_term = (lambda / (2 * m)) * j_theta_summation;
@@ -83,10 +83,16 @@ logistic_fn = ((-Y).*log(h)) - ((1 - Y).*log(1 - h));
 J = ((1/m) * sum(sum(logistic_fn, 2)));
 J = J + j_reg_term;
 
-
-
-
 % -------------------------------------------------------------
+
+sigma3 = a3 - Y;
+sigma2 = (sigma3 * Theta2 .* sigmoidGradient([ones(size(z2, 1), 1) z2]))(:, 2:end);
+
+delta1 = sigma2' * a1;
+delta2 = sigma3' * a2;
+
+Theta1_grad = delta1./m + (lambda/m)*[zeros(size(Theta1,1), 1) Theta1(:, 2:end)];
+Theta2_grad = delta2./m + (lambda/m)*[zeros(size(Theta2,1), 1) Theta2(:, 2:end)];
 
 % =========================================================================
 
