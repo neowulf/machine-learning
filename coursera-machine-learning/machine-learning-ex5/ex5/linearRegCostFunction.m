@@ -19,15 +19,24 @@ grad = zeros(size(theta));
 %               You should set J to the cost and grad to the gradient.
 %
 
+% sigmoid function
+% z = X * theta;
+% h = (1 ./ ( 1 .+ e .^ (-z)));
 
+h = X * theta;
 
+theta = [0; theta(2:end)];
+j_theta_summation = ((theta .^ 2)' * ones(rows(theta), 1));
+j_reg_term = (lambda / (2 * m)) * j_theta_summation;
 
+% logistic_fn = ((-y' * log(h)) - ((1 - y)' * log(1 - h)));
+% J = ((1 / m) * logistic_fn) + j_reg_term;
 
+j_summation = ((h - y) .^ 2)'  * ones(rows(h), 1);
+J = ((1 / (2 * m)) * j_summation) + j_reg_term;
 
-
-
-
-
+g_reg_term = (lambda / m) .* theta;
+grad = ((1 / m) * (X' * (h - y))) + g_reg_term;
 
 
 % =========================================================================

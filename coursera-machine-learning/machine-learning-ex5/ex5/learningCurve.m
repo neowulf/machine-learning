@@ -54,6 +54,30 @@ error_val   = zeros(m, 1);
 % ---------------------- Sample Solution ----------------------
 
 
+%% Plotting learning curves mapping training data size to error curves
+for i = 1:m
+    % Compute train/cross validation errors using training examples
+    % X(1:i, :) and y(1:i), storing the result in
+    % error_train(i) and error_val(i)
+
+    ts_x = X(1:i, :);
+    ts_y = y(1:i);
+
+    m = size(ts_x, 1);
+
+    % Train on the training subset data
+    theta = trainLinearReg([ones(m, 1) ts_x], ts_y, lambda);
+
+    % Training error - error on the training subset data
+    error_train(i) = linearRegCostFunction([ones(m, 1) ts_x], ts_y, theta, 0);
+
+    % Cross Validation error - error on the full cross validation data
+    cv_x = Xval;
+    cv_y = yval;
+    m = size(cv_x, 1);
+    error_val(i) = linearRegCostFunction([ones(m, 1) cv_x], cv_y, theta, 0);
+end
+
 
 
 
