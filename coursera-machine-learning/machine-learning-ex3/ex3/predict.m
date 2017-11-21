@@ -21,11 +21,17 @@ p = zeros(size(X, 1), 1);
 %       can use max(A, [], 2) to obtain the max for each row.
 %
 
+% theta1 has 25 * 401
+% theta2 has 10 * 26
 
+% Add ones to the X data matrix
+X = [ones(m, 1) X];
+layer1 = sigmoid(X * Theta1');
 
-
-
-
+layer1 = [ones(m, 1) layer1];
+predict = sigmoid(layer1 * Theta2');
+[predict_max, index_max] = max(predict, [], 2);
+p = index_max;
 
 
 
