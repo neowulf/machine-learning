@@ -16,7 +16,9 @@ sim = 0;
 %
 %
 
-
+summation = ((x1 - x2) .^ 2)' * ones(rows(x1), 1);
+exponent = (- summation) / (2 * (sigma ^ 2));
+sim = e .^ exponent;
 
 
 
