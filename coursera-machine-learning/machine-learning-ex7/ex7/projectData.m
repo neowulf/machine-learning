@@ -23,4 +23,13 @@ Z = zeros(size(X, 1), K);
 
 % =============================================================
 
+m = size(Z, 1);
+k = 1:K;
+
+for i = 1:m
+	x = X(i, :)';
+	projection_k = x' * U(:, k);
+	Z(i,:) = projection_k;
+end
+	
 end

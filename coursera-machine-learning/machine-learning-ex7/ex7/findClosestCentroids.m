@@ -20,14 +20,18 @@ idx = zeros(size(X,1), 1);
 %
 % Note: You can use a for-loop over the examples to compute this.
 %
-
-
-
-
-
+	
+m = size(X, 1);
+for x_i = 1:m
+	for k_i = 1:K
+		% printf('Processing: %d\n', x_i);
+		diff = (X(x_i,:) - centroids(k_i,:)) .^ 2;
+		distance(1, k_i) = sqrt(sum(diff));
+	end
+	[minimum, index] = min(distance(:));
+	idx(x_i) = index;
 
 
 % =============================================================
 
 end
-
