@@ -22,7 +22,9 @@ sigma2 = zeros(n, 1);
 %
 
 
-
+mu = sum(X) ./ m
+	
+sigma2 = var(X) .* (m - 1) ./ m
 
 
 
