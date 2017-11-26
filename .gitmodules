@@ -2,3 +2,7 @@
 	path = learning_stats/ThinkStats2
 	url = https://github.com/AllenDowney/ThinkStats2.git
 	branch = master
+[submodule "handson-ml-with-scikit-tf/handson-ml"]
+	path = handson-ml-with-scikit-tf/handson-ml
+	url = https://github.com/ageron/handson-ml.git
+	branch = master
