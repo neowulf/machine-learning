@@ -6,3 +6,7 @@
 	path = handson-ml-with-scikit-tf/handson-ml
 	url = https://github.com/ageron/handson-ml.git
 	branch = master
+[submodule "courses"]
+	path = fastai/courses
+	url = https://github.com/fastai/courses.git
+	branch = master
