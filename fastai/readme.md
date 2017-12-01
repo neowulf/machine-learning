@@ -5,9 +5,12 @@ cd /home/ubuntu/machine-learning/fastai
 ```
 1. Update packages
 ```bash
-pip install --upgrade pip
+pip install --upgrade pip 
 pip install kaggle-cli
-sudo apt install unzip tree htop
+
+conda install theano pygpu
+
+sudo apt install unzip tree htop silversearcher-ag
 ```
 
 1. Update the jupyter configuration at `~/.jupyter/jupyter_notebook_config.py`
