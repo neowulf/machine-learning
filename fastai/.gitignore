@@ -1,3 +1,10 @@
 .kaggle-cli
-lesson1/dogs-vs-cats-redux-kernels-edition/data
 .ipynb_checkpoints
+
+## Processed datasets
+**/dataset
+
+## Kaggle Files
+train.zip
+test.zip
+sample_submission.csv
