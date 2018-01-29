@@ -49,6 +49,14 @@ class KerasVgg16:
         f = preprocess_input(f)
         return f
 
+    def save_weights(self, filename):
+        os.makedirs(self.weights_dir, exist_ok=True)
+        self.model.save_weights(os.path.join(self.weights_dir, filename + '.h5'))
+
+    ################################################################################################
+    # Processes the images while training - takes a long time!
+    ################################################################################################
+
     def generator(self, directory, batch_size, class_mode='categorical', shuffle=True):
         datagen = ImageDataGenerator(
             data_format='channels_last',
@@ -68,22 +76,22 @@ class KerasVgg16:
         batches = generator
         batch_array = np.concatenate([batches.next() for i in range(batches.samples)])
         return self.save_array(filename, batch_array)
-    
+
     def load_bcolz_generator(self, filename, labels, batch_size):
         """
         Feed the result in fit_generator as a generator
         """
         batch_array = self.load_array(filename)
-        gen = image.ImageDataGenerator(rotation_range=10, width_shift_range=0.05, 
-                                       width_zoom_range=0.05, zoom_range=0.05, channel_shift_range=10, 
+        gen = image.ImageDataGenerator(rotation_range=10, width_shift_range=0.05,
+                                       width_zoom_range=0.05, zoom_range=0.05, channel_shift_range=10,
                                        height_shift_range=0.05, shear_range=0.05, horizontal_flip=True)
 
         gen = image.ImageDataGenerator()
         return gen.flow(batch_array, labels, batch_size)
-    
+
     def onehot(self, x):
         return to_categorical(x)
-                 
+
     def save_array(self, filename, arr):
         f = os.path.join(self.weights_dir, filename + '.colz')
         c=bcolz.carray(arr, rootdir=f, mode='w')
@@ -101,7 +109,7 @@ class KerasVgg16:
 
         return classes
 
-    def finetune(self, 
+    def finetune(self,
                  train_generator,
                  validation_generator,
                  epochs=3,
@@ -118,7 +126,7 @@ class KerasVgg16:
                 epochs=epochs,
                 validation_data=validation_generator,
                 validation_steps=validation_steps,
-                max_queue_size=10, 
+                max_queue_size=10,
                 workers=1,
                 use_multiprocessing=use_multiprocessing,
             )
@@ -133,6 +141,16 @@ class KerasVgg16:
     def load_weights(self, filename):
         self.model.load_weights(os.path.join(self.weights_dir, filename + '.h5'))
 
+    ################################################################################################
+    # Preprocess the images using bcolz
+    ################################################################################################
+
+
+
+    ################################################################################################
+    # Predictions
+    ################################################################################################
+
     def predict_generator(self, test_dir):
         def get_data_as_np(path):
             batches = self.generator(path, 10, class_mode=None, shuffle=False)
@@ -141,3 +159,14 @@ class KerasVgg16:
         preds = self.model.predict(get_data_as_np(test_dir), verbose=1)
 
         return preds
+
+    ################################################################################################
+    # Kaggle Submission
+    ################################################################################################
+
+    def classifications(self, train_generator):
+        classes = list(iter(train_generator.class_indices))
+        for c in train_generator.class_indices:
+            classes[train_generator.class_indices[c]] = c
+
+        return classes
