@@ -36,6 +36,10 @@ class KerasVgg16:
 
         self.model = model
 
+    ################################################################################################
+    # Processes the images while training - takes a long time!
+    ################################################################################################
+
     def process_img(self, img, using_generator=True):
         """
         :param img: could be the file path or the numpy representation
@@ -48,14 +52,6 @@ class KerasVgg16:
         f = np.expand_dims(img, axis=0)
         f = preprocess_input(f)
         return f
-
-    def save_weights(self, filename):
-        os.makedirs(self.weights_dir, exist_ok=True)
-        self.model.save_weights(os.path.join(self.weights_dir, filename + '.h5'))
-
-    ################################################################################################
-    # Processes the images while training - takes a long time!
-    ################################################################################################
 
     def generator(self, directory, batch_size, class_mode='categorical', shuffle=True):
         datagen = ImageDataGenerator(
@@ -71,43 +67,6 @@ class KerasVgg16:
         )
 
         return datagenerator
-
-    def save_generator(self, generator, filename):
-        batches = generator
-        batch_array = np.concatenate([batches.next() for i in range(batches.samples)])
-        return self.save_array(filename, batch_array)
-
-    def load_bcolz_generator(self, filename, labels, batch_size):
-        """
-        Feed the result in fit_generator as a generator
-        """
-        batch_array = self.load_array(filename)
-        gen = image.ImageDataGenerator(rotation_range=10, width_shift_range=0.05,
-                                       width_zoom_range=0.05, zoom_range=0.05, channel_shift_range=10,
-                                       height_shift_range=0.05, shear_range=0.05, horizontal_flip=True)
-
-        gen = image.ImageDataGenerator()
-        return gen.flow(batch_array, labels, batch_size)
-
-    def onehot(self, x):
-        return to_categorical(x)
-
-    def save_array(self, filename, arr):
-        f = os.path.join(self.weights_dir, filename + '.colz')
-        c=bcolz.carray(arr, rootdir=f, mode='w')
-        c.flush()
-        return c
-
-    def load_array(self, filename):
-        f = os.path.join(self.weights_dir, filename + '.colz')
-        return bcolz.open(f)[:]
-
-    def classifications(self, train_generator):
-        classes = list(iter(train_generator.class_indices))
-        for c in train_generator.class_indices:
-            classes[train_generator.class_indices[c]] = c
-
-        return classes
 
     def finetune(self,
                  train_generator,
@@ -134,6 +93,10 @@ class KerasVgg16:
             if weights_filename_template is not None:
                 self.save_weights('{}_{}'.format(weights_filename_template, epoch))
 
+    ################################################################################################
+    # Save the model weights
+    ################################################################################################
+
     def save_weights(self, filename):
         os.makedirs(self.weights_dir, exist_ok=True)
         self.model.save_weights(os.path.join(self.weights_dir, filename + '.h5'))
@@ -145,7 +108,37 @@ class KerasVgg16:
     # Preprocess the images using bcolz
     ################################################################################################
 
+    def save_generator(self, generator, filename):
+        batches = generator
+        batch_array = np.concatenate([batches.next() for i in range(batches.samples)])
+        return self.save_array(filename, batch_array)
 
+    def load_bcolz_generator(self, filename, labels, batch_size):
+        """
+        Feed the result in fit_generator as a generator
+        """
+        batch_array = self.load_array(filename)
+
+        # TODO image augmentation parameters
+        # gen = image.ImageDataGenerator(rotation_range=10, width_shift_range=0.05,
+        #                                width_zoom_range=0.05, zoom_range=0.05, channel_shift_range=10,
+        #                                height_shift_range=0.05, shear_range=0.05, horizontal_flip=True)
+
+        gen = image.ImageDataGenerator()
+        return gen.flow(batch_array, labels, batch_size)
+
+    def onehot(self, x):
+        return to_categorical(x)
+
+    def save_array(self, filename, arr):
+        f = os.path.join(self.weights_dir, filename + '.colz')
+        c=bcolz.carray(arr, rootdir=f, mode='w')
+        c.flush()
+        return c
+
+    def load_array(self, filename):
+        f = os.path.join(self.weights_dir, filename + '.colz')
+        return bcolz.open(f)[:]
 
     ################################################################################################
     # Predictions
