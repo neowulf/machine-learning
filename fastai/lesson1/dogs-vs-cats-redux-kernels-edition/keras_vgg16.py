@@ -1,5 +1,7 @@
 import os
+from pathlib import Path
 
+import bcolz
 import numpy as np
 from keras.applications.vgg16 import VGG16
 from keras.applications.vgg16 import preprocess_input
@@ -8,9 +10,24 @@ from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing import image
 from keras.preprocessing.image import ImageDataGenerator
-from keras.utils.np_utils import to_categorical
-import bcolz
+from tqdm import tqdm
 
+from bcolz_array_iterator import BcolzArrayIterator
+
+SEED=10
+current_dir = Path(os.getcwd())
+DATASET_DIR = current_dir / 'dataset'
+CROSSVALID_DIR = DATASET_DIR / 'cross_valid'
+TRAIN_DIR = DATASET_DIR / 'train'
+TEST_DIR = DATASET_DIR / 'test'
+SAMPLE_DIR = DATASET_DIR / 'sample'
+
+SAMPLE_TRAIN_DIR = SAMPLE_DIR / 'train'
+SAMPLE_CROSSVALID_DIR = SAMPLE_DIR / 'cross_valid'
+
+WEIGHTS_DIR = current_dir / 'weights'
+
+np.random.seed(SEED)
 
 class KerasVgg16:
     def __init__(self, weights_dir):
@@ -68,6 +85,12 @@ class KerasVgg16:
 
         return datagenerator
 
+    def steps(self, generator):
+        result = generator.samples // generator.batch_size
+        if result < 1:
+            result = 1
+        return result
+
     def finetune(self,
                  train_generator,
                  validation_generator,
@@ -75,8 +98,8 @@ class KerasVgg16:
                  weights_filename_template=None,
                  use_multiprocessing=False):
 
-        train_steps_per_epoch = train_generator.samples // train_generator.batch_size
-        validation_steps = validation_generator.samples // validation_generator.batch_size
+        train_steps_per_epoch = self.steps(train_generator)
+        validation_steps = self.steps(validation_generator)
 
         for epoch in range(epochs):
             self.model.fit_generator(
@@ -84,11 +107,12 @@ class KerasVgg16:
                 steps_per_epoch=train_steps_per_epoch,
                 epochs=epochs,
                 validation_data=validation_generator,
-                validation_steps=validation_steps,
-                max_queue_size=10,
-                workers=1,
-                use_multiprocessing=use_multiprocessing,
+                validation_steps=validation_steps
             )
+            #     max_queue_size=10,
+            #     workers=1,
+            #     use_multiprocessing=use_multiprocessing
+            # )
 
             if weights_filename_template is not None:
                 self.save_weights('{}_{}'.format(weights_filename_template, epoch))
@@ -105,40 +129,98 @@ class KerasVgg16:
         self.model.load_weights(os.path.join(self.weights_dir, filename + '.h5'))
 
     ################################################################################################
+    # Save datagenerator to bcolz array. To load:
+    #   data = bcolz.open(data_dir)
+    #
+    # Source: http://notes.johnvial.info/using-bcolz-with-keras-generators.html
+    ################################################################################################
+
+    def save_bcolz_generator(self, gen, dir, type):
+        """
+        The generator should use batch_size of 1. See the following comment in https://github.com/fastai/courses/blob/master/deeplearning1/nbs/lesson2.ipynb
+            # Use batch size of 1 since we're just doing preprocessing on the CPU
+
+        Save the output from a generator without loading all images into memory.
+
+        Does not return anything, instead writes data to disk.
+
+        :gen: A Keras ImageDataGenerator object
+        :data_dir: The folder name to store the bcolz array representing the features in.
+        :labels_dir: The folder name to store the bcolz array representing the labels in.
+        :mode: the write mode. Set to 'a' for append, set to 'w' to overwrite existing data and 'r' to read only.
+        """
+        data_dir = Path(dir) / '..' / (type + '_data.bcolz')
+        labels_dir = Path(dir) / '..' / (type + '_label.bcolz')
+        for directory in [data_dir, labels_dir]:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            else:
+                print('Found "%s". May have been processed already!' % (directory))
+                return
+
+        num_samples = gen.samples
+
+        d, l = gen.__next__()
+
+        data = bcolz.carray(d, rootdir=data_dir, mode='w')
+        labels = bcolz.carray(l, rootdir=labels_dir, mode='w')
+
+        for i in tqdm(range(num_samples - 1)):
+            d, l = gen.__next__()
+            data.append(d)
+            labels.append(l)
+        data.flush()
+        labels.flush()
+
+    def load_bcolz_generator(self, dir, type, batch_size=64):
+        X = bcolz.open(Path(dir) / '..' / (type + '_data.bcolz'), mode='r')
+        y = bcolz.open(Path(dir) / '..' / (type + '_label.bcolz'), mode='r')
+        return BcolzArrayIterator(X, y, batch_size=batch_size, shuffle=True, seed=SEED)
+
+    ################################################################################################
     # Preprocess the images using bcolz
     ################################################################################################
 
-    def save_generator(self, generator, filename):
-        batches = generator
-        batch_array = np.concatenate([batches.next() for i in range(batches.samples)])
-        return self.save_array(filename, batch_array)
-
-    def load_bcolz_generator(self, filename, labels, batch_size):
-        """
-        Feed the result in fit_generator as a generator
-        """
-        batch_array = self.load_array(filename)
-
-        # TODO image augmentation parameters
-        # gen = image.ImageDataGenerator(rotation_range=10, width_shift_range=0.05,
-        #                                width_zoom_range=0.05, zoom_range=0.05, channel_shift_range=10,
-        #                                height_shift_range=0.05, shear_range=0.05, horizontal_flip=True)
-
-        gen = image.ImageDataGenerator()
-        return gen.flow(batch_array, labels, batch_size)
-
-    def onehot(self, x):
-        return to_categorical(x)
-
-    def save_array(self, filename, arr):
-        f = os.path.join(self.weights_dir, filename + '.colz')
-        c=bcolz.carray(arr, rootdir=f, mode='w')
-        c.flush()
-        return c
-
-    def load_array(self, filename):
-        f = os.path.join(self.weights_dir, filename + '.colz')
-        return bcolz.open(f)[:]
+    # def save_generator(self, generator, filename):
+    #     # bcolz approach
+    #     # train_generator = self.generator(TRAIN_DIR, 50, shuffle=False)
+    #     # self.save_generator(train_generator, 'sample_train')
+    #
+    #     batches = generator
+    #     batch_array = np.concatenate([batches.next() for i in tqdm(range(batches.samples))])
+    #     return self.save_array(filename, batch_array)
+    #
+    # def load_bcolz_generator(self, filename, labels, batch_size):
+    #     """
+    #     Feed the result in fit_generator as a generator
+    #     """
+    #     batch_array = self.load_array(filename)
+    #
+    #     # TODO image augmentation parameters
+    #     # gen = image.ImageDataGenerator(rotation_range=10, width_shift_range=0.05,
+    #     #                                width_zoom_range=0.05, zoom_range=0.05, channel_shift_range=10,
+    #     #                                height_shift_range=0.05, shear_range=0.05, horizontal_flip=True)
+    #
+    #     gen = image.ImageDataGenerator()
+    #     return gen.flow(batch_array, labels, batch_size)
+    #
+    # def onehot(self, x):
+    #     return to_categorical(x)
+    #
+    # def save_array(self, filename, arr):
+    #     bcolz_dir = os.path.join(self.weights_dir, filename + '.colz')
+    #
+    #     if not os.path.exists(bcolz_dir):
+    #         os.makedirs(bcolz_dir)
+    #
+    #     print('Saving to %s'.format(bcolz_dir))
+    #     c = bcolz.carray(arr, rootdir=bcolz_dir, mode='w')
+    #     c.flush()
+    #     return c
+    #
+    # def load_array(self, filename):
+    #     bcolz_dir = os.path.join(self.weights_dir, filename + '.colz')
+    #     return bcolz.open(bcolz_dir)[:]
 
     ################################################################################################
     # Predictions

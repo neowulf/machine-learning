@@ -21,36 +21,12 @@ get_ipython().run_line_magic('aimport', 'keras_vgg16')
 from keras_vgg16 import *
 
 
-# ## Project Setup
-
-# In[2]:
-
-
-import os
-import shutil
-from glob import glob
-np.random.seed(10)
-
-current_dir = os.getcwd()
-DATASET_DIR=os.path.join(current_dir, 'dataset')
-CROSSVALID_DIR=os.path.join(DATASET_DIR, 'cross_valid')
-TRAIN_DIR = os.path.join(DATASET_DIR, 'train')
-TEST_DIR = os.path.join(DATASET_DIR, 'test')
-CROSSVALID_DIR = os.path.join(DATASET_DIR, 'cross_valid')
-SAMPLE_DIR = os.path.join(DATASET_DIR, 'sample')
-
-SAMPLE_TRAIN_DIR=os.path.join(SAMPLE_DIR, 'train')
-SAMPLE_CROSSVALID_DIR=os.path.join(SAMPLE_DIR, 'cross_valid')
-
-WEIGHTS_DIR = os.path.join(current_dir, 'weights')
-
-
 # ## Model preparation
 
 # ### Finetune the keras model
 # * Pop the last layer, freeze all layers, add a softmax layer and update set of classes
 
-# In[3]:
+# In[2]:
 
 
 vgg16 = KerasVgg16(WEIGHTS_DIR)
@@ -58,50 +34,142 @@ vgg16.create_model(learning_rate = 0.01, ttl_outputs=2)
 vgg16.model.summary()
 
 
+# In[3]:
+
+
+train_dir = SAMPLE_TRAIN_DIR
+crossvalid_dir = SAMPLE_CROSSVALID_DIR
+
+train_generator = vgg16.generator(train_dir, 1, shuffle=False)
+vgg16.save_bcolz_generator(train_generator, train_dir, 'train')
+
+crossvalid_generator = vgg16.generator(crossvalid_dir, 1, shuffle=False)
+vgg16.save_bcolz_generator(crossvalid_generator, crossvalid_dir, 'crossvalid')
+
+
+# In[6]:
+
+
+train = vgg16.load_bcolz_generator(train_dir, 'train')
+validation = vgg16.load_bcolz_generator(crossvalid_dir, 'crossvalid')
+vgg16.finetune(train, validation, epochs=2)
+
+
 # ### Fit the keras model
 # 1. Train the updated keras model
 
-# In[4]:
+# In[7]:
 
 
-train_generator = vgg16.generator(TRAIN_DIR, 250)
-valid_generator = vgg16.generator(CROSSVALID_DIR, 250)
+train_dir = TRAIN_DIR
+crossvalid_dir = CROSSVALID_DIR
 
-# 581 seconds per epoch when use_multiprocessing=False
-# vgg16.finetune(train_generator, valid_generator, epochs=3)
+train_generator = vgg16.generator(train_dir, 1, shuffle=False)
+vgg16.save_bcolz_generator(train_generator, train_dir, 'train')
 
-# use_multiprocessing=True - couldn't pickle..doesn't work with tensorflow?
-# vgg16.finetune(train_generator, valid_generator, epochs=2, use_multiprocessing=True)
-
-# bcolz approach
-vgg16.save_generator(train_generator, 'sample_train')
-vgg16.save_generator(valid_generator, 'sample_valid')
+crossvalid_generator = vgg16.generator(crossvalid_dir, 1, shuffle=False)
+vgg16.save_bcolz_generator(crossvalid_generator, crossvalid_dir, 'crossvalid')
 
 
-# In[ ]:
+# In[9]:
 
 
-trn = vgg16.load_bcolz_generator('sample_train', self.onehot(train_generator), 35)
-valid = vgg16.load_bcolz_generator('sample_valid', self.onehot(valid_generator), 35)
-
-
-# In[ ]:
-
-
-vgg16.finetune(trn, valid, epochs=2)
+train = vgg16.load_bcolz_generator(train_dir, 'train')
+validation = vgg16.load_bcolz_generator(crossvalid_dir, 'crossvalid')
+vgg16.finetune(train, validation, epochs=2)
 
 
 # ### Save and load the model after couple of epochs
 
-# In[ ]:
+# In[10]:
 
 
-# filename='3_epochs_finetune_96'
-# vgg16.save_weights(filename)
-# vgg16.load_weights(filename)
+filename='2_epochs_finetune_0.9684'
+vgg16.save_weights(filename)
+vgg16.load_weights(filename)
 
 
 # ## Perform predictions
+
+# In[11]:
+
+
+preds = vgg16.predict_generator(TEST_DIR)
+
+
+# In[12]:
+
+
+preds.shape
+
+
+# In[13]:
+
+
+preds[:3]
+
+
+# In[24]:
+
+
+from matplotlib import pyplot as plt
+import matplotlib.image as mpimg
+plt.rcParams['axes.labelsize'] = 14
+plt.rcParams['xtick.labelsize'] = 12
+plt.rcParams['ytick.labelsize'] = 12
+
+# default [6, 4] - controls size of the graph
+plt.rcParams['figure.figsize'] = [6, 4]
+
+def plot_images(graph_title, images, figsize=(12,6), titles=None, interp=None, rows=1):
+    f = plt.figure(figsize=(12,6))
+    f.gca(title=graph_title)
+    cols = len(images) // rows if len(images) %2 == 0 else len(images)//rows + 1
+    for i in range(len(images)):
+        sp = f.add_subplot(rows, cols, i+1)
+        sp.axis('Off')
+        if titles is not None:
+            sp.set_title(titles[i], fontsize=16)
+        plt.imshow(images[i], interpolation=None if interp else 'None')
+        
+# Load the image
+img = []
+size = 16
+for i in range(size):
+    if i == 0:
+        continue
+    file = '%d.jpg' % i
+    img_path = TEST_DIR / 'unknown' / file
+    img.append(image.load_img(img_path, target_size=(224, 224)))
+    
+    
+# onehot = [0 if pred[0] > pred[1] else 1 for pred in preds[:size] ]    
+dog_pred = [pred[1] for pred in preds[:size]]
+plot_images('test', img, titles=dog_pred, rows=3)
+
+
+# In[40]:
+
+
+# from keras.utils.np_utils import to_categorical
+# from sklearn.preprocessing import OneHotEncoder
+# def onehot(x): return np.array(OneHotEncoder().fit_transform(x.reshape(-1,1)).todense())
+# preds.shape
+
+# dog_pred = [pred[1] for pred in preds[:size]]
+# dog_pred[:3]
+
+import csv
+with open('kaggle.csv', 'w') as csvfile:
+    fieldnames = ['id', 'label']
+    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+    writer.writeheader()
+    for idx, pred in enumerate(preds):
+        # result = 1 if pred[1] > pred[0] else 0
+        result = 1 if pred[0] > pred[1] else 0
+        writer.writerow({'id': idx+1, 'label': result})
+
 
 # ## Kaggle Submit
 
