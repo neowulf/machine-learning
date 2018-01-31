@@ -3,7 +3,7 @@
 
 # ## Preamble
 
-# In[121]:
+# In[1]:
 
 
 # Allows for interactive shell - outputs all non variable statements
@@ -100,7 +100,7 @@ vgg16.classifications(crossvalid_generator)
 
 # Cat is 0 and Dog is 1
 
-# In[103]:
+# In[9]:
 
 
 crossvalid_dir = SAMPLE_CROSSVALID_DIR
@@ -128,7 +128,7 @@ preds.shape
 
 # ### Confusion Matrix
 
-# In[144]:
+# In[11]:
 
 
 expected=np.array([1.0 if valid[1] == 1 else 0.0 for valid in validation.y])
@@ -145,7 +145,7 @@ print(validation.X[0].shape)
 print(len(crossvalid_generator.filenames))
 
 
-# In[139]:
+# In[12]:
 
 
 get_ipython().run_line_magic('reload_ext', 'autoreload')
@@ -158,7 +158,7 @@ plot_confusion_matrix(cm, crossvalid_generator.class_indices, normalize=False, t
 
 # ### Plot sample predictions
 
-# In[179]:
+# In[13]:
 
 
 get_ipython().run_line_magic('reload_ext', 'autoreload')
@@ -183,25 +183,25 @@ def plot(title, criteria):
     plot_images(title, images, rows=1, titles=titles)
 
 
-# In[182]:
+# In[14]:
 
 
 plot('True Positive', (expected == 1) & (actual == expected))
 
 
-# In[172]:
+# In[15]:
 
 
 plot('True Negative', (expected == 0) & (actual == expected))
 
 
-# In[183]:
+# In[16]:
 
 
 plot('False Positive', (expected == 0) & (actual == 1))
 
 
-# In[184]:
+# In[17]:
 
 
 plot('False Negative', (expected == 1) & (actual == 0))
@@ -209,7 +209,7 @@ plot('False Negative', (expected == 1) & (actual == 0))
 
 # ## Predictions
 
-# In[222]:
+# In[18]:
 
 
 test_dir = TEST_DIR
@@ -223,7 +223,7 @@ test = vgg16.load_bcolz_generator(test_dir, 'test', batch_size=batch_size, shuff
 print(test.X.shape)
 
 
-# In[226]:
+# In[19]:
 
 
 print(test.samples)
@@ -236,25 +236,20 @@ test_preds = vgg16.model.predict_generator(test, steps=(test.samples / test.batc
 test_preds.shape
 
 
-# In[234]:
+# In[20]:
 
 
 vgg16.save_array('preds_' + filename, test_preds)
 
 
-# In[237]:
+# In[21]:
 
 
-preds = vgg16.load_array('preds_2_epochs_finetune_0.9684')
-
-
-# In[238]:
-
-
+preds = vgg16.load_array('preds_' + filename)
 preds.shape
 
 
-# In[240]:
+# In[23]:
 
 
 #Grab the dog prediction column
@@ -264,7 +259,7 @@ print ("Mid Predictions: " + str(isdog[(isdog < .6) & (isdog > .4)]))
 print ("Edge Predictions: " + str(isdog[(isdog == 1) | (isdog == 0)]))
 
 
-# In[244]:
+# In[24]:
 
 
 #Swap all ones with .95 and all zeros with .05
@@ -272,25 +267,17 @@ isdog = isdog.clip(min=0.05, max=0.95)
 #Extract imageIds from the filenames in our test/unknown directory 
 filenames = test_generator.filenames
 ids = np.array([int(f[8:f.find('.')]) for f in filenames])
-ids.shape
-
-
-# In[245]:
-
-
+print(ids.shape)
+# Stack both arrays column wise
 subm = np.stack([ids,isdog], axis=1)
 subm[:5]
 
 
-# In[247]:
+# In[28]:
 
 
-submission_file_name = 'submission1.csv'
+submission_file_name = 'submission_' + filename + '_1.44666.csv'
 np.savetxt(submission_file_name, subm, fmt='%d,%.5f', header='id,label', comments='')
-
-
-# In[263]:
-
 
 from IPython.display import FileLink
 FileLink(str(current_dir) +  "/" + submission_file_name)

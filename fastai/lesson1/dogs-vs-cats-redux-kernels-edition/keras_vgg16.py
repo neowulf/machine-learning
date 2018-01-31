@@ -212,7 +212,7 @@ class KerasVgg16:
 
         if not os.path.exists(bcolz_dir):
             os.makedirs(bcolz_dir)
-        else
+        else:
             print('dir already exists %s' % bcolz_dir)
             return 
 
