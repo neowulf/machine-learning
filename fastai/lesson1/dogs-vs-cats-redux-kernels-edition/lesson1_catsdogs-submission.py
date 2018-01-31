@@ -3,7 +3,7 @@
 
 # ## Preamble
 
-# In[1]:
+# In[121]:
 
 
 # Allows for interactive shell - outputs all non variable statements
@@ -18,6 +18,8 @@ get_ipython().run_line_magic('config', "InlineBackend.figure_format = 'retina'")
 get_ipython().run_line_magic('load_ext', 'autoreload')
 get_ipython().run_line_magic('autoreload', '1')
 get_ipython().run_line_magic('aimport', 'keras_vgg16')
+get_ipython().run_line_magic('aimport', 'utils')
+from utils import *
 from keras_vgg16 import *
 
 
@@ -31,7 +33,6 @@ from keras_vgg16 import *
 
 vgg16 = KerasVgg16(WEIGHTS_DIR)
 vgg16.create_model(learning_rate = 0.01, ttl_outputs=2)
-vgg16.model.summary()
 
 
 # In[3]:
@@ -47,18 +48,18 @@ crossvalid_generator = vgg16.generator(crossvalid_dir, 1, shuffle=False)
 vgg16.save_bcolz_generator(crossvalid_generator, crossvalid_dir, 'crossvalid')
 
 
-# In[6]:
+# In[4]:
 
 
 train = vgg16.load_bcolz_generator(train_dir, 'train')
 validation = vgg16.load_bcolz_generator(crossvalid_dir, 'crossvalid')
-vgg16.finetune(train, validation, epochs=2)
+#vgg16.finetune(train, validation, epochs=2)
 
 
 # ### Fit the keras model
 # 1. Train the updated keras model
 
-# In[7]:
+# In[5]:
 
 
 train_dir = TRAIN_DIR
@@ -71,107 +72,226 @@ crossvalid_generator = vgg16.generator(crossvalid_dir, 1, shuffle=False)
 vgg16.save_bcolz_generator(crossvalid_generator, crossvalid_dir, 'crossvalid')
 
 
-# In[9]:
+# In[6]:
 
 
 train = vgg16.load_bcolz_generator(train_dir, 'train')
 validation = vgg16.load_bcolz_generator(crossvalid_dir, 'crossvalid')
-vgg16.finetune(train, validation, epochs=2)
+#vgg16.finetune(train, validation, epochs=2)
 
 
 # ### Save and load the model after couple of epochs
 
-# In[10]:
+# In[7]:
 
 
 filename='2_epochs_finetune_0.9684'
-vgg16.save_weights(filename)
+#vgg16.save_weights(filename)
 vgg16.load_weights(filename)
+
+
+# ## CrossValidation
+
+# In[8]:
+
+
+vgg16.classifications(crossvalid_generator)
+
+
+# Cat is 0 and Dog is 1
+
+# In[103]:
+
+
+crossvalid_dir = SAMPLE_CROSSVALID_DIR
+
+crossvalid_generator = vgg16.generator(crossvalid_dir, 1, shuffle=False)
+
+batch_size = 10
+validation = vgg16.load_bcolz_generator(crossvalid_dir, 'crossvalid', batch_size=batch_size, shuffle=False)
+print(validation.X.shape)
+
+#test_batch, preds = vgg16.predict_generator(TEST_DIR)
+validation_preds = vgg16.model.predict_generator(validation, steps=validation.samples / batch_size)
+validation_preds.shape
+
+
+# In[10]:
+
+
+vgg16.save_array('validation_preds_' + filename, validation_preds)
+preds = vgg16.load_array('validation_preds_' + filename)
+preds.shape
 
 
 # ## Perform predictions
 
-# In[11]:
+# ### Confusion Matrix
+
+# In[144]:
 
 
-preds = vgg16.predict_generator(TEST_DIR)
+expected=np.array([1.0 if valid[1] == 1 else 0.0 for valid in validation.y])
+print("Expected Beginning %s" % expected[:5])
+print("Expected End %s" % expected[-5:])
+
+#Round our predictions to 0/1 to generate labels
+our_predictions = preds[:,0]
+actual = np.round(1-our_predictions)
+print("Actual %s" % actual)
+
+print(crossvalid_dir)
+print(validation.X[0].shape)
+print(len(crossvalid_generator.filenames))
 
 
-# In[12]:
+# In[139]:
+
+
+get_ipython().run_line_magic('reload_ext', 'autoreload')
+from utils import *
+
+from sklearn.metrics import confusion_matrix
+cm = confusion_matrix(expected, actual)
+plot_confusion_matrix(cm, crossvalid_generator.class_indices, normalize=False, title='Confusion matrix')
+
+
+# ### Plot sample predictions
+
+# In[179]:
+
+
+get_ipython().run_line_magic('reload_ext', 'autoreload')
+
+# correct = np.where(actual==expected)[0]
+# print ("Found %d correct labels" % len(correct))
+# np.random.shuffle(correct)
+# correct = correct[:5]
+# images = [image.load_img(Path(crossvalid_dir) / crossvalid_generator.filenames[c], target_size=(224, 224)) for c in correct]
+# titles = [actual[c] for c in correct]
+# plot_images('True Positive', images, rows=1, titles=titles)
+
+def plot(title, criteria):
+    matches = np.where(criteria)[0]
+    print('Found %d %s labels' % (len(matches), title))
+    np.random.shuffle(matches)
+    matches = matches[:5]
+    images = [image.load_img(Path(crossvalid_dir) / crossvalid_generator.filenames[m], 
+                             target_size=(224, 224)) for m in matches]
+    titles = ['%d - %s' % (actual[m], crossvalid_generator.filenames[m].split('/')[1]) for m in matches]
+    print('Found in %s' % crossvalid_dir)
+    plot_images(title, images, rows=1, titles=titles)
+
+
+# In[182]:
+
+
+plot('True Positive', (expected == 1) & (actual == expected))
+
+
+# In[172]:
+
+
+plot('True Negative', (expected == 0) & (actual == expected))
+
+
+# In[183]:
+
+
+plot('False Positive', (expected == 0) & (actual == 1))
+
+
+# In[184]:
+
+
+plot('False Negative', (expected == 1) & (actual == 0))
+
+
+# ## Predictions
+
+# In[222]:
+
+
+test_dir = TEST_DIR
+
+print('Loading %s' % test_dir)
+test_generator = vgg16.generator(test_dir, 1, shuffle=False)
+
+batch_size = 10
+vgg16.save_bcolz_generator(test_generator, test_dir, 'test')
+test = vgg16.load_bcolz_generator(test_dir, 'test', batch_size=batch_size, shuffle=False)
+print(test.X.shape)
+
+
+# In[226]:
+
+
+print(test.samples)
+print(test.batch_size)
+
+# OOME
+# test_preds = vgg16.model.predict_on_batch(test.X)
+
+test_preds = vgg16.model.predict_generator(test, steps=(test.samples / test.batch_size) + 1, verbose=1)
+test_preds.shape
+
+
+# In[234]:
+
+
+vgg16.save_array('preds_' + filename, test_preds)
+
+
+# In[237]:
+
+
+preds = vgg16.load_array('preds_2_epochs_finetune_0.9684')
+
+
+# In[238]:
 
 
 preds.shape
 
 
-# In[13]:
+# In[240]:
 
 
-preds[:3]
+#Grab the dog prediction column
+isdog = preds[:,1]
+print ("Raw Predictions: " + str(isdog[:5]))
+print ("Mid Predictions: " + str(isdog[(isdog < .6) & (isdog > .4)]))
+print ("Edge Predictions: " + str(isdog[(isdog == 1) | (isdog == 0)]))
 
 
-# In[24]:
+# In[244]:
 
 
-from matplotlib import pyplot as plt
-import matplotlib.image as mpimg
-plt.rcParams['axes.labelsize'] = 14
-plt.rcParams['xtick.labelsize'] = 12
-plt.rcParams['ytick.labelsize'] = 12
-
-# default [6, 4] - controls size of the graph
-plt.rcParams['figure.figsize'] = [6, 4]
-
-def plot_images(graph_title, images, figsize=(12,6), titles=None, interp=None, rows=1):
-    f = plt.figure(figsize=(12,6))
-    f.gca(title=graph_title)
-    cols = len(images) // rows if len(images) %2 == 0 else len(images)//rows + 1
-    for i in range(len(images)):
-        sp = f.add_subplot(rows, cols, i+1)
-        sp.axis('Off')
-        if titles is not None:
-            sp.set_title(titles[i], fontsize=16)
-        plt.imshow(images[i], interpolation=None if interp else 'None')
-        
-# Load the image
-img = []
-size = 16
-for i in range(size):
-    if i == 0:
-        continue
-    file = '%d.jpg' % i
-    img_path = TEST_DIR / 'unknown' / file
-    img.append(image.load_img(img_path, target_size=(224, 224)))
-    
-    
-# onehot = [0 if pred[0] > pred[1] else 1 for pred in preds[:size] ]    
-dog_pred = [pred[1] for pred in preds[:size]]
-plot_images('test', img, titles=dog_pred, rows=3)
+#Swap all ones with .95 and all zeros with .05
+isdog = isdog.clip(min=0.05, max=0.95)
+#Extract imageIds from the filenames in our test/unknown directory 
+filenames = test_generator.filenames
+ids = np.array([int(f[8:f.find('.')]) for f in filenames])
+ids.shape
 
 
-# In[40]:
+# In[245]:
 
 
-# from keras.utils.np_utils import to_categorical
-# from sklearn.preprocessing import OneHotEncoder
-# def onehot(x): return np.array(OneHotEncoder().fit_transform(x.reshape(-1,1)).todense())
-# preds.shape
-
-# dog_pred = [pred[1] for pred in preds[:size]]
-# dog_pred[:3]
-
-import csv
-with open('kaggle.csv', 'w') as csvfile:
-    fieldnames = ['id', 'label']
-    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-    writer.writeheader()
-    for idx, pred in enumerate(preds):
-        # result = 1 if pred[1] > pred[0] else 0
-        result = 1 if pred[0] > pred[1] else 0
-        writer.writerow({'id': idx+1, 'label': result})
+subm = np.stack([ids,isdog], axis=1)
+subm[:5]
 
 
-# ## Kaggle Submit
+# In[247]:
 
-# ### Prepare csv file and Submit
-# 
+
+submission_file_name = 'submission1.csv'
+np.savetxt(submission_file_name, subm, fmt='%d,%.5f', header='id,label', comments='')
+
+
+# In[263]:
+
+
+from IPython.display import FileLink
+FileLink(str(current_dir) +  "/" + submission_file_name)
+

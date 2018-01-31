@@ -172,10 +172,10 @@ class KerasVgg16:
         data.flush()
         labels.flush()
 
-    def load_bcolz_generator(self, dir, type, batch_size=64):
+    def load_bcolz_generator(self, dir, type, batch_size=64, shuffle=True):
         X = bcolz.open(Path(dir) / '..' / (type + '_data.bcolz'), mode='r')
         y = bcolz.open(Path(dir) / '..' / (type + '_label.bcolz'), mode='r')
-        return BcolzArrayIterator(X, y, batch_size=batch_size, shuffle=True, seed=SEED)
+        return BcolzArrayIterator(X, y, batch_size=batch_size, shuffle=shuffle, seed=SEED)
 
     ################################################################################################
     # Preprocess the images using bcolz
@@ -207,33 +207,32 @@ class KerasVgg16:
     # def onehot(self, x):
     #     return to_categorical(x)
     #
-    # def save_array(self, filename, arr):
-    #     bcolz_dir = os.path.join(self.weights_dir, filename + '.colz')
-    #
-    #     if not os.path.exists(bcolz_dir):
-    #         os.makedirs(bcolz_dir)
-    #
-    #     print('Saving to %s'.format(bcolz_dir))
-    #     c = bcolz.carray(arr, rootdir=bcolz_dir, mode='w')
-    #     c.flush()
-    #     return c
-    #
-    # def load_array(self, filename):
-    #     bcolz_dir = os.path.join(self.weights_dir, filename + '.colz')
-    #     return bcolz.open(bcolz_dir)[:]
+    def save_array(self, filename, arr):
+        bcolz_dir = os.path.join(current_dir, filename + '.colz')
+
+        if not os.path.exists(bcolz_dir):
+            os.makedirs(bcolz_dir)
+        else
+            print('dir already exists %s' % bcolz_dir)
+            return 
+
+        print('Saving to %s'.format(bcolz_dir))
+        c = bcolz.carray(arr, rootdir=bcolz_dir, mode='w')
+        c.flush()
+        return c
+
+    def load_array(self, filename):
+        bcolz_dir = os.path.join(current_dir, filename + '.colz')
+        return bcolz.open(bcolz_dir)[:]
 
     ################################################################################################
     # Predictions
     ################################################################################################
 
-    def predict_generator(self, test_dir):
-        def get_data_as_np(path):
-            batches = self.generator(path, 10, class_mode=None, shuffle=False)
-            return np.concatenate([batches.next() for i in range(len(batches))])
-
-        preds = self.model.predict(get_data_as_np(test_dir), verbose=1)
-
-        return preds
+    def predict_generator_dir(self, test_dir):
+        test_generator = self.generator(test_dir, 10, class_mode=None, shuffle=False)
+        preds = self.model.predict_generator(test_generator, self.steps(test_generator))
+        return test_generator, preds
 
     ################################################################################################
     # Kaggle Submission

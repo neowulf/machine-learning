@@ -3,6 +3,7 @@
 
 ## Processed datasets
 **/dataset
+**/*.colz
 
 ## Kaggle Files
 train.zip
