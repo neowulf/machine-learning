@@ -1,0 +1,236 @@
+
+%matplotlib inline
+%config InlineBackend.figure_format = 'retina'
+
+import seaborn as sns
+sns.set(style="white")
+
+# Allows for interactive shell - outputs all non variable statements
+from IPython.core.interactiveshell import InteractiveShell
+InteractiveShell.ast_node_interactivity = "all"
+
+import numpy as np
+np.set_printoptions(precision=4, linewidth=100)
+
+from matplotlib import pyplot as plt
+
+from keras.applications.vgg16 import VGG16
+from keras.preprocessing import image
+from keras.applications.vgg16 import preprocess_input, decode_predictions
+import numpy as np
+
+model = VGG16(weights='imagenet', include_top=True)
+
+# Unzip a single file to test on the pretrained model
+!unzip -oj "test.zip" "test/1.jpg" -d "/tmp/cats_dogs"
+
+# Load the image
+img_path = '/tmp/cats_dogs/1.jpg'
+img = image.load_img(img_path, target_size=(224, 224))
+
+# Plot the single image
+f = plt.figure(figsize=(10, 5))
+sp = f.add_subplot(1, 1, 1) ## (rows, cols, index)
+sp.axis('On')
+sp.set_title(img_path, fontsize=16)
+plt.imshow(img)
+
+x = image.img_to_array(img)
+x = np.expand_dims(x, axis=0)
+x = preprocess_input(x)
+
+preds = model.predict(x)
+decode_predictions(preds)
+
+import os
+import shutil
+from glob import glob
+np.random.seed(10)
+
+current_dir = os.getcwd()
+DATASET_DIR=os.path.join(current_dir, 'dataset')
+CROSSVALID_DIR=os.path.join(DATASET_DIR, 'cross_valid')
+TRAIN_DIR = os.path.join(DATASET_DIR, 'train')
+TEST_DIR = os.path.join(DATASET_DIR, 'test')
+CROSSVALID_DIR = os.path.join(DATASET_DIR, 'cross_valid')
+SAMPLE_DIR = os.path.join(DATASET_DIR, 'sample')
+
+WEIGHTS_DIR = os.path.join(DATASET_DIR, 'weights')
+
+# Start from fresh
+!rm -rf dataset
+!mkdir dataset
+!unzip -q train.zip -d $DATASET_DIR
+!unzip -q test.zip -d $DATASET_DIR
+!tree -d
+
+!find dataset -maxdepth 5 -type d -exec sh -c "echo '{}'; ls -1 '{}' | wc -l" \; | xargs -n 2 | awk '{print $1" "$2}'
+
+def create_crossvalidation(perc = 0.1):
+    """
+    moves `perc` of train dir to cross validation dir
+    """
+    os.makedirs(CROSSVALID_DIR, exist_ok=True)
+    g = glob(os.path.join(TRAIN_DIR, '*.jpg'))
+    shuf = np.random.permutation(g)
+    for i in range(int(shuf.shape[0] * perc)):
+        filename = os.path.basename(shuf[i])
+        os.rename(shuf[i], os.path.join(CROSSVALID_DIR, filename))
+
+def create_sample(sample_train_size=200, sample_test_size=50):
+    """
+    sample perc of train data is copied to sample directory
+    creates sample train and sample test directories
+    """
+    
+    sample_train_dir = os.path.join(SAMPLE_DIR, 'train')
+    sample_test_dir = os.path.join(SAMPLE_DIR, 'test')
+    
+    g = glob(os.path.join(TRAIN_DIR, '*.jpg'))
+    shuf = np.random.permutation(g)
+    
+    ## SPLIT
+    train_set = shuf[0:sample_train_size]
+    test_set = shuf[sample_train_size:sample_train_size + sample_test_size]
+    
+    os.makedirs(sample_train_dir, exist_ok=True)
+    for i in train_set:
+        filename = os.path.basename(i)
+        shutil.copy(i, os.path.join(sample_train_dir, filename))
+    
+    os.makedirs(sample_test_dir, exist_ok=True)
+    for i in test_set:
+        filename = os.path.basename(i)
+        shutil.copy(i, os.path.join(sample_test_dir, filename))
+
+#     for i in range(int(shuf.shape[0] * perc)):
+#         filename = os.path.basename(shuf[i])
+#         shutil.copy(shuf[i], os.path.join(SAMPLE_DIR, filename))
+
+def create_labels(abs_directory, labels = ['cat', 'dog']):
+    """
+    partitions the directories into new directory which is the label
+    """
+    if labels is None:
+        label = 'unknown'
+        target_dir=os.path.join(abs_directory, label)
+        os.makedirs(target_dir, exist_ok=True)
+        for file in glob(os.path.join(abs_directory, '*.jpg')):
+            target = os.path.join(target_dir, os.path.basename(file))
+            shutil.move(file, target)
+    else:
+        for label in labels:
+            target_dir=os.path.join(abs_directory, label)
+            os.makedirs(target_dir, exist_ok=True)
+            for file in glob(os.path.join(abs_directory, label + '.*.jpg')):
+                target = os.path.join(target_dir, os.path.basename(file))
+                shutil.move(file, target)
+    
+# Create the cross validation set
+create_crossvalidation()
+
+# Create the sample set
+create_sample()
+
+# Create labeled directories for each of the sets
+create_labels(TRAIN_DIR)
+create_labels(CROSSVALID_DIR)
+create_labels(SAMPLE_DIR+'/train')
+create_labels(SAMPLE_DIR+'/test')
+create_labels(TEST_DIR, labels=None)
+
+!find $DATASET_DIR -maxdepth 5 -type d -exec \
+   sh -c "echo '{}'; ls -1 '{}' | wc -l" \; | xargs -n 2 | awk '{print $1" "$2}'
+
+from keras.layers.core import Dense
+from keras.models import Model
+from keras.optimizers import Adam
+
+ttl_outputs = 2
+learning_rate = 0.01
+
+base_model = VGG16(weights='imagenet', include_top=True)
+
+inputs = base_model.input
+outputs = Dense(ttl_outputs, activation='softmax')(base_model.output)
+
+model = Model(inputs=inputs, outputs=outputs)
+
+for layer in base_model.layers:
+    layer.trainable = False
+
+model.compile(optimizer=Adam(lr = learning_rate), 
+              loss='categorical_crossentropy', 
+              metrics=['accuracy'])
+
+from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
+
+batch_size = 4
+epochs = 3
+train_dir = SAMPLE_DIR
+
+nb_train_samples = sum([len(files) for r, d, files in os.walk(train_dir)])
+nb_validation_samples = sum([len(files) for r, d, files in os.walk(CROSSVALID_DIR)])
+
+def process_img(img_path):
+    img = image.load_img(img_path, target_size(224,244))
+    f = img.img_to_array(img)
+    f = np.expand_dims(f, axis=0)
+    f = preprocess_input(f)
+    return f
+
+# datagen = ImageDataGenerator(preprocessing_function=process_img)
+datagen = ImageDataGenerator(
+    data_format='channels_last')
+
+train_generator = datagen.flow_from_directory(
+    train_dir,
+    target_size=(224, 224),
+    batch_size=batch_size,
+    class_mode='categorical'
+)
+
+validation_generator = datagen.flow_from_directory(
+    CROSSVALID_DIR,
+    target_size=(224, 224),
+    batch_size=batch_size,
+    class_mode='categorical'
+)
+# add preprocessing to the image?
+
+classes = list(iter(train_generator.class_indices))
+for c in train_generator.class_indices:
+    classes[train_generator.class_indices[c]] = c
+
+train_generator.class_indices
+classes
+
+model.fit_generator(
+    train_generator,
+    steps_per_epoch=nb_train_samples // batch_size,
+    epochs=epochs,
+    validation_data=validation_generator,
+    validation_steps=nb_validation_samples // batch_size)
+
+!mkdir -p $WEIGHTS_DIR
+
+model.save_weights(os.path.join(WEIGHTS_DIR, 'intial_run_1.h5'))
+model.load_weights(os.path.join(WEIGHTS_DIR, 'intial_run_1.h5'))
+
+train_generator.class_indices
+??model.evaluate()
+
+def get_data_as_np(path):
+    batches = datagen.flow_from_directory(
+        path,
+        target_size=(224, 224),
+        batch_size=10,
+        class_mode=None,
+        shuffle=False
+    )
+    return np.concatenate([batches.next() for i in range(len(batches))])
+
+preds = model.predict(get_data_as_np(CROSSVALID_DIR), verbose=1)
+
+
+preds[1:4]

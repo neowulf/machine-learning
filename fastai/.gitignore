@@ -1,0 +1,11 @@
+.kaggle-cli
+.ipynb_checkpoints
+
+## Processed datasets
+**/dataset
+**/*.colz
+
+## Kaggle Files
+train.zip
+test.zip
+sample_submission.csv
